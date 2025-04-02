@@ -1,20 +1,25 @@
 use crate::{Safety, Visibility};
 use either::Either;
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Program {
     pub file_name: String,
-    pub members: Vec<ProgramMember>
+    pub members: Vec<ProgramMember>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum ProgramMember {
     FunctionDeclaration(FunctionDeclaration),
     VariableDeclaration(VariableDeclaration),
     StructDeclaration(StructDeclaration),
     TraitDeclaration(TraitDeclaration),
     UseDeclaration(UseDeclaration),
-    ModuleDeclaration(ModuleDeclaration)
+    ModuleDeclaration(ModuleDeclaration),
+    #[default]
+    Null,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct FunctionDeclaration {
     pub visibility: Visibility,
     pub safety: Safety,
@@ -25,14 +30,16 @@ pub struct FunctionDeclaration {
     pub name: String,
     pub parameters: Vec<Parameter>,
     pub r#type: Option<Type>,
-    pub body: Option<Block>
+    pub body: Option<Block>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Parameter {
     pub name: String,
-    pub r#type: Type
+    pub r#type: Type,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct VariableDeclaration {
     pub visibility: Visibility,
     pub safety: Safety,
@@ -40,48 +47,56 @@ pub struct VariableDeclaration {
     pub is_extern: bool,
     pub name: String,
     pub r#type: Option<Type>,
-    pub value: Option<Expression>
+    pub value: Option<Expression>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct StructDeclaration {
     pub visibility: Visibility,
     pub safety: Safety,
     pub is_abstract: bool,
     pub name: String,
     pub inherits: Vec<Path>,
-    pub items: Vec<Either<FunctionDeclaration, VariableDeclaration>>
+    pub items: Vec<Either<FunctionDeclaration, VariableDeclaration>>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct TraitDeclaration {
     pub visibility: Visibility,
     pub name: String,
-    pub items: Vec<Either<FunctionDeclaration, VariableDeclaration>>
+    pub items: Vec<Either<FunctionDeclaration, VariableDeclaration>>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct UseDeclaration {
-    pub path: Path
+    pub path: Path,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct ModuleDeclaration {
     pub visibility: Visibility,
     pub name: String,
-    pub items: Vec<ModuleMember>
+    pub items: Vec<ModuleMember>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Path {
-    pub segments: Vec<String>
+    pub segments: Vec<String>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Block {
-    pub statements: Vec<Statement>
+    pub statements: Vec<Statement>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Identifier {
     pub name: String,
     pub arguments: Option<Vec<Expression>>,
-    pub child: Option<Box<Identifier>>
+    pub child: Option<Box<Identifier>>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum Statement {
     VariableAssignment(VariableAssignment),
     VariableDeclaration(VariableDeclaration),
@@ -94,55 +109,68 @@ pub enum Statement {
     WhileLoop(WhileLoop),
     ReturnStatement(Expression),
     ContinueStatement,
-    BreakStatement
+    BreakStatement,
+    #[default]
+    Null,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct VariableAssignment {
     pub name: Identifier,
     pub operator: String,
-    pub value: Expression
+    pub value: Expression,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct ForLoop {
     pub name: String,
     pub iterator: Identifier,
-    pub body: Box<Statement>
+    pub body: Box<Statement>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct IfStatement {
     pub condition: Expression,
     pub body: Box<Statement>,
-    pub else_body: Option<Box<Statement>>
+    pub else_body: Option<Box<Statement>>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct LoopStatement {
-    pub body: Box<Statement>
+    pub body: Box<Statement>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct SwitchStatement {
     pub condition: Expression,
-    pub cases: Vec<Case>
+    pub cases: Vec<Case>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Case {
     pub case: Expression,
-    pub body: Block
+    pub body: Block,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct WhileLoop {
     pub condition: Expression,
-    pub body: Box<Statement>
+    pub body: Box<Statement>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum ModuleMember {
     VariableDeclaration(VariableDeclaration),
     FunctionDeclaration(FunctionDeclaration),
     ModuleDeclaration(ModuleDeclaration),
     StructDeclaration(StructDeclaration),
     TraitDeclaration(TraitDeclaration),
-    UseDeclaration(UseDeclaration)
+    UseDeclaration(UseDeclaration),
+    #[default]
+    Null,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum Type {
     PointerType(Box<Type>),
     ReferenceType(Box<Type>),
@@ -151,82 +179,52 @@ pub enum Type {
     TupleType(Vec<Type>),
     PathType(Path),
     PrimativeType(String),
-    ArrayType(Box<Type>, Literal)
+    ArrayType(Box<Type>, Literal),
+    #[default]
+    Null,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum Expression {
     Parentheses(Box<Expression>),
-    OrExpr(OrExpr),
+    BinOp(BinOp),
     FunctionCall(Identifier),
     UnaryOperation(UnaryOperation),
     Literal(Literal),
-    Identifier(Identifier)
+    Identifier(Identifier),
+    Cast(Cast),
+    #[default]
+    Null,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum Literal {
     StringLiteral(String),
-    NumberLiteral(String),
+    IntegerLiteral(String),
+    FloatLiteral(String),
     CharLiteral(char),
     BooleanLiteral(bool),
     ArrayLiteral(Vec<Expression>),
-    TupleLiteral(Vec<Expression>)
+    TupleLiteral(Vec<Expression>),
+    #[default]
+    Null,
 }
 
-pub struct OrExpr {
-    pub left: Box<OrExpr>,
-    pub right: Box<AndExpr>
-}
-
-pub struct AndExpr {
-    pub left: Box<AndExpr>,
-    pub right: Box<CmpExpr>
-}
-
-pub struct CmpExpr {
-    pub left: Box<CmpExpr>,
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub struct BinOp {
+    pub left: Box<Expression>,
     pub operator: String,
-    pub right: Box<BitOrExpr>
+    pub right: Box<Expression>,
 }
 
-pub struct BitOrExpr {
-    pub left: Box<BitOrExpr>,
-    pub right: Box<BitXorExpr>
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub struct Cast {
+    pub left: Box<Expression>,
+    pub right: Type,
 }
 
-pub struct BitXorExpr {
-    pub left: Box<BitXorExpr>,
-    pub right: Box<BitAndExpr>
-}
-
-pub struct BitAndExpr {
-    pub left: Box<BitAndExpr>,
-    pub right: Box<ShiftExpr>
-}
-
-pub struct ShiftExpr {
-    pub left: Box<ShiftExpr>,
-    pub operator: String,
-    pub right: Box<AddExpr>
-}
-
-pub struct AddExpr {
-    pub left: Box<AddExpr>,
-    pub operator: String,
-    pub right: Box<MulExpr>
-}
-
-pub struct MulExpr {
-    pub left: Box<MulExpr>,
-    pub operator: String,
-    pub right: Box<CastExpr>
-}
-
-pub struct CastExpr {
-    pub left: Box<UnaryOperation>,
-    pub right: Type
-}
-
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct UnaryOperation {
     pub operator: String,
-    pub expression: Box<Expression>
+    pub expression: Box<Expression>,
 }

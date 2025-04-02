@@ -1,6 +1,7 @@
 use crate::token::{Token, TokenKind};
 
 /// An error from the lexer
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct LexerError {
     pub message: String,
     pub line: usize,
@@ -8,6 +9,7 @@ pub struct LexerError {
 }
 
 /// The lexer
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Lexer {
     /// The tokens
     pub tokens: Vec<Token>,
@@ -43,14 +45,13 @@ impl Lexer {
             if self.peek(0)?.is_whitespace() {
                 if self.peek(0)? == '\n' {
                     self.line += 1;
+                    self.position += 1;
                     self.column = 1;
-                }
-                else {
+                } else {
                     self.consume()?;
                 }
                 continue;
-            }
-            else if self.peek(0)?.is_numeric() {
+            } else if self.peek(0)?.is_numeric() {
                 buffer.push(self.consume()?);
                 while self.peek(0)?.is_numeric() || self.peek(0)? == '.' {
                     buffer.push(self.consume()?);
@@ -60,8 +61,7 @@ impl Lexer {
                 token.end_col = self.column;
                 self.tokens.push(token);
                 buffer.clear();
-            }
-            else if self.peek(0)? == '"' {
+            } else if self.peek(0)? == '"' {
                 self.consume()?;
                 while self.peek(0)? != '"' {
                     buffer.push(self.consume()?);
@@ -72,16 +72,14 @@ impl Lexer {
                 token.end_col = self.column;
                 self.tokens.push(token);
                 buffer.clear();
-            }
-            else if self.peek(0)? == '\'' {
+            } else if self.peek(0)? == '\'' {
                 self.consume()?;
                 token.value = self.consume()?.to_string();
                 self.consume()?;
                 token.kind = TokenKind::Char;
                 token.end_col = self.column;
                 self.tokens.push(token);
-            }
-            else if self.peek(0)?.is_alphabetic() {
+            } else if self.peek(0)?.is_alphabetic() {
                 buffer.push(self.consume()?);
                 while self.peek(0)?.is_alphanumeric() || self.peek(0)? == '_' {
                     buffer.push(self.consume()?);
@@ -134,14 +132,14 @@ impl Lexer {
                     "f64" => TokenKind::F64Kw,
                     "bool" => TokenKind::BoolKw,
                     "char" => TokenKind::CharKw,
+                    "void" => TokenKind::VoidKw,
                     _ => TokenKind::Name,
                 };
                 token.value = buffer.clone();
                 token.end_col = self.column;
                 self.tokens.push(token);
                 buffer.clear();
-            }
-            else {
+            } else {
                 buffer.push(self.consume()?);
                 token.kind = match buffer.as_str() {
                     ";" => TokenKind::Semicolon,
@@ -169,7 +167,11 @@ impl Lexer {
                     "/" => TokenKind::Slash,
                     "%" => TokenKind::Percent,
                     _ => TokenKind::Unknown,
-                }
+                };
+                token.end_col = self.column;
+                token.value = buffer.clone();
+                self.tokens.push(token);
+                buffer.clear();
             }
         }
 

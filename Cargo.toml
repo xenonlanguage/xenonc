@@ -1,7 +1,22 @@
 [package]
-name = "xenon"
-version = "0.1.0"
+name = "xenonc"
+version = "0.1.0-alpha-0"
+authors = ["Liam Greenway <liamgr33nway@gmail.com>"]
 edition = "2024"
+rust-version = "1.87.0"
+description = "The Xenon compiler"
+readme = "README.md"
+homepage = "https://xenonlanguage.github.io"
+license = "MPL-2"
+keywords = ["xenon", "language", "compiler", "programming", "xenonc"]
+categories = ["command-line-utilities", "compilers", "development-tools", "parser-implementations"]
+
+[dependencies]
+xenon_lexer = {path = "xenon_lexer", version = "0.1.0"}
+xenon_parser = {path = "xenon_parser", version = "0.1.0"}
+human-panic = "2.0.2"
+logex = "2.0.1"
+clap = { version = "4.5.35", features = ["derive"] }
 
 [workspace]
 members = [

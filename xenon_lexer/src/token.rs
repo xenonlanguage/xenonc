@@ -1,5 +1,5 @@
 /// The kind of token
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum TokenKind {
     Number,
     String,
@@ -51,6 +51,7 @@ pub enum TokenKind {
     F64Kw,
     BoolKw,
     CharKw,
+    VoidKw,
     Semicolon,
     Comma,
     Dot,
@@ -76,10 +77,11 @@ pub enum TokenKind {
     Slash,
     Percent,
     Name,
+    #[default]
     Unknown,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Token {
     pub kind: TokenKind,
     pub value: String,

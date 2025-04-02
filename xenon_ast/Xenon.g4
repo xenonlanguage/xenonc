@@ -112,80 +112,34 @@ primativeType: I8KW
                |CHARKW ;
 
 expression:
-    parentheses
-    | orExpr
-    | functionCall
-    | unaryOperation
-    | literal
-    | identifier;
+    | orExpr;
 
 literal:
     stringLiteral
     | numberLiteral
     | charLiteral
-    | booleanLiteral
-    | arrayLiteral
-    | tupleLiteral;
+    | booleanLiteral;
 
 stringLiteral: STRING;
 charLiteral: CHAR;
 numberLiteral: NUMBER;
 booleanLiteral: TRUEKW | FALSEKW;
 
-arrayLiteral: OPENBRACKET (expression COMMA?)* CLOSEBRACKET;
-tupleLiteral: OPENPAREN (expression COMMA?)* CLOSEPAREN;
-
 parentheses: OPENPAREN expression CLOSEPAREN;
 
-unaryOperation:
-    orExpr
-    | (PLUS | MINUS | BANG | AND | STAR expression);
-
-castExpr:
-    unaryOperation
-    | castExpr ASKW type;
-
-mulExpr:
-    castExpr
-    | mulExpr STAR castExpr
-    | mulExpr SLASH castExpr
-    | mulExpr PERCENT castExpr;
-
-addExpr:
-    mulExpr
-    | addExpr PLUS mulExpr
-    | addExpr MINUS mulExpr;
-
-shiftExpr:
-    addExpr
-    | shiftExpr LESSTHAN LESSTHAN addExpr
-    | shiftExpr GREATERTHAN GREATERTHAN addExpr;
-
-bitAndExpr:
-    shiftExpr
-    | bitAndExpr AND shiftExpr;
-
-bitXorExpr:
-    bitAndExpr
-    | bitXorExpr CARAT bitAndExpr;
-
-bitOrExpr:
-    bitXorExpr
-    | bitOrExpr OR bitXorExpr;
-
-cmpExpr:
-    bitOrExpr
-    | bitOrExpr ((EQUAL EQUAL) | (BANG EQUAL) | (LESSTHAN) | (LESSTHAN EQUAL) | (GREATERTHAN) | (GREATERTHAN EQUAL)) bitOrExpr;
-
-andExpr:
-    cmpExpr
-    | andExpr AND AND cmpExpr;
-    
-orExpr:
-    andExpr
-    | orExpr OR OR andExpr;
+orExpr: andExpr (OR OR andExpr)*;
+andExpr: cmpExpr (AND AND cmpExpr)*;
+cmpExpr: bitOrExpr ((EQUAL EQUAL | BANG EQUAL | LESSTHAN | LESSTHAN EQUAL | GREATERTHAN | GREATERTHAN EQUAL) bitOrExpr)*;
+bitOrExpr: bitXorExpr (OR bitXorExpr)*;
+bitXorExpr: bitAndExpr (CARAT bitAndExpr)*;
+bitAndExpr: shiftExpr (AND shiftExpr)*;
+shiftExpr: addExpr ((LESSTHAN LESSTHAN | GREATERTHAN GREATERTHAN) addExpr)*;
+addExpr: mulExpr ((PLUS | MINUS) mulExpr)*;
+mulExpr: castExpr ((STAR | SLASH | PERCENT) castExpr)*;
+castExpr: unaryOperation (ASKW type)?;
+unaryOperation: (PLUS | MINUS | BANG | AND | STAR)? primary;
 
 primary:
-    literal
-    | identifier
-    | OPENPAREN expression CLOSEPAREN;
+    identifier
+    | parentheses
+    | literal;
