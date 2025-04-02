@@ -9,10 +9,26 @@ programMember:
     | useDeclaration
     | moduleDeclaration;
 
-functionDeclaration: (PUBLICKW | PRIVATEKW)? (UNSAFEKW | SAFEKW)? EXTERNKW? OVERRIDEKW? VIRTUALKW? ASYNCKW? FNKW NAME OPENPAREN (parameter (COMMA parameter)*)? CLOSEPAREN (MINUS GREATERTHAN type)? (block | SEMICOLON);
+functionDeclaration:
+    (PUBLICKW | PRIVATEKW | UNSAFEKW | SAFEKW | EXTERNKW | OVERRIDEKW | VIRTUALKW | ASYNCKW)*
+    FNKW NAME
+    OPENPAREN (parameter (COMMA parameter)*)? CLOSEPAREN
+    (MINUS GREATERTHAN type)?
+    (block | SEMICOLON);
 parameter: NAME COLON type;
-variableDeclaration: (PUBLICKW | PRIVATEKW)? (UNSAFEKW | SAFEKW)? CONSTKW? EXTERNKW? LETKW NAME (COLON type)? (EQUAL expression) SEMICOLON;
-structDeclaration: (PUBLICKW | PRIVATEKW)? ABSTRACTKW? STRUCTKW NAME (COLON path+) OPENBRACE (functionDeclaration | variableDeclaration)* CLOSEBRACE;
+variableDeclaration:
+    (PUBLICKW | PRIVATEKW | UNSAFEKW | SAFEKW | CONSTKW | EXTERNKW)*
+    LETKW NAME
+    (COLON type)?
+    (EQUAL expression)?
+    SEMICOLON;
+structDeclaration:
+    (PUBLICKW | PRIVATEKW | ABSTRACTKW | UNSAFEKW | SAFEKW)*
+    STRUCTKW NAME
+    (COLON path+)?
+    OPENBRACE
+        (functionDeclaration | variableDeclaration)*
+    CLOSEBRACE;
 traitDeclaration: (PUBLICKW | PRIVATEKW)? TRAITKW NAME (functionDeclaration | variableDeclaration)*;
 useDeclaration: USEKW path;
 moduleDeclaration: (PUBLICKW | PRIVATEKW)? MODULEKW NAME OPENBRACE moduleMember* CLOSEBRACE;
@@ -72,7 +88,6 @@ moduleMember:
 type:
     pointerType
     | referenceType
-    | functionRefType
     | tupleType
     | pathType
     | primativeType;
@@ -80,7 +95,6 @@ type:
 arrayType: type OPENBRACKET numberLiteral CLOSEBRACKET;
 pointerType: STAR type;
 referenceType: REFKW type;
-functionRefType: NAME OPENPAREN (type COMMA?)* CLOSEPAREN;
 tupleType: OPENPAREN (type COMMA?)* CLOSEPAREN;
 pathType: path;
 primativeType: I8KW
