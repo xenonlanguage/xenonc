@@ -7,7 +7,7 @@ rust-version = "1.87.0"
 repository = "https://github.com/xenonlanguage/xenonc"
 description = "The Xenon compiler's AST representation"
 homepage = "https://xenonlanguage.github.io"
-license = "MPL-2"
+license = "MPL-2.0"
 keywords = ["xenon", "language", "ast", "programming"]
 categories = ["parsing", "parser-implementations"]
 
