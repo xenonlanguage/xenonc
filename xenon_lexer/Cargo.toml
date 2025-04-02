@@ -1,6 +1,12 @@
 [package]
 name = "xenon_lexer"
-version = "0.1.0"
+version = "0.1.0-alpha-0"
+authors = ["Liam Greenway <liamgr33nway@gmail.com>"]
 edition = "2024"
-
-[dependencies]
+rust-version = "1.87.0"
+repository = "https://github.com/xenonlanguage/xenonc"
+description = "The Xenon compiler's lexer"
+homepage = "https://xenonlanguage.github.io"
+license = "MPL-2.0"
+keywords = ["xenon", "language", "lexer", "programming"]
+categories = ["text-processing"]

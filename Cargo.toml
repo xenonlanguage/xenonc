@@ -18,10 +18,3 @@ xenon_parser = {path = "xenon_parser", version = "0.1.0"}
 human-panic = "2.0.2"
 logex = "2.0.1"
 clap = { version = "4.5.35", features = ["derive"] }
-
-[workspace]
-members = [
-    "xenon_ast",
-    "xenon_lexer",
-    "xenon_parser"
-]
