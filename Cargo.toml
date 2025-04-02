@@ -4,6 +4,7 @@ version = "0.1.0-alpha-0"
 authors = ["Liam Greenway <liamgr33nway@gmail.com>"]
 edition = "2024"
 rust-version = "1.87.0"
+repository = "https://github.com/xenonlanguage/xenonc"
 description = "The Xenon compiler"
 readme = "README.md"
 homepage = "https://xenonlanguage.github.io"
