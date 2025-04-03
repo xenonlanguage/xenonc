@@ -1,9 +1,0 @@
-[package]
-name = "xenon_parser"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-xenon_lexer = {path = "../xenon_lexer"}
-xenon_ast = {path = "../xenon_ast"}
-either = "1.15.0"
