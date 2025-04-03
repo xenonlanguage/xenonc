@@ -1,7 +1,16 @@
 [package]
 name = "xenonc"
 version = "0.1.0"
+authors = ["Liam Greenway <liamgr33nway@gmail.com>"]
 edition = "2024"
+rust-version = "1.85.0"
+description = "The xenon compiler."
+readme = "README.md"
+homepage = "https://xenonlanguage.github.io/"
+repository = "https://github.com/xenonlanguage/xenonc"
+license = "MPL-2.0"
+keywords = ["xenon", "compiler", "cli", "build", "language"]
+categories = ["compilers"]
 
 [dependencies]
 clap = { version = "4.5.35", features = ["derive"] }
