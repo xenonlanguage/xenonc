@@ -1,12 +1,12 @@
-use either::Either;
 use crate::ast::{
-    BinOp, Block, Case, Cast, Expression, ForLoop, FunctionDeclaration, Identifier, IfStatement,
+    BinOp, Block, Case, Cast, Expression, ForLoop, FunctionDeclaration, IfStatement,
     Literal, LoopStatement, ModuleDeclaration, ModuleMember, Parameter, Path, Program,
     ProgramMember, Statement, StructDeclaration, SwitchStatement, TraitDeclaration, Type,
     UnaryOperation, UseDeclaration, VariableAssignment, VariableDeclaration, WhileLoop,
 };
 use crate::ast::{Safety, Visibility};
 use crate::lexer::token::{Token, TokenKind};
+use either::Either;
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct ParseError {
@@ -469,36 +469,9 @@ impl Parser {
         }
     }
 
-    pub fn parse_identifier(&mut self) -> Result<Identifier, ParseError> {
-        let mut identifier = Identifier {
-            name: self.consume()?.value,
-            arguments: None,
-            child: None,
-        };
-
-        if self.match_token(TokenKind::OpenParen, 0)? {
-            self.consume()?;
-            let mut args = vec![];
-            while !self.match_token(TokenKind::CloseParen, 0)? {
-                args.push(self.parse_expression()?);
-                if !self.match_token(TokenKind::CloseParen, 0)? {
-                    self.consume()?; // SKip ','
-                }
-            }
-            self.consume()?; // Skip ')'
-            identifier.arguments = Some(args);
-        }
-        if self.match_token(TokenKind::Dot, 0)? {
-            self.consume()?;
-            identifier.child = Some(Box::new(self.parse_identifier()?));
-        }
-
-        Ok(identifier)
-    }
-
     pub fn parse_primary(&mut self) -> Result<Expression, ParseError> {
         if self.match_token(TokenKind::Name, 0)? {
-            Ok(Expression::Identifier(self.parse_identifier()?))
+            Ok(Expression::Identifier(self.parse_path()?))
         } else if self.match_token(TokenKind::OpenParen, 0)? {
             self.consume()?;
             let exp = self.parse_expression()?;
@@ -621,7 +594,7 @@ impl Parser {
     }
 
     pub fn parse_variable_assignment(&mut self) -> Result<VariableAssignment, ParseError> {
-        let name = self.parse_identifier()?;
+        let name = self.parse_path()?;
         let operator = self.parse_assignment_operator()?;
         let value = self.parse_expression()?;
         Ok(VariableAssignment {
@@ -635,7 +608,7 @@ impl Parser {
         self.consume()?; // SKip 'for'
         let name = self.consume()?.value;
         self.consume()?; // Skip 'in'
-        let iterator = self.parse_identifier()?;
+        let iterator = self.parse_path()?;
         Ok(ForLoop {
             name,
             iterator,
@@ -709,7 +682,7 @@ impl Parser {
                     self.parse_variable_assignment()?,
                 ))
             } else {
-                let res = Ok(Statement::FunctionCall(self.parse_identifier()?));
+                let res = Ok(Statement::FunctionCall(self.parse_path()?));
                 self.consume()?; // SKip ';'
                 res
             }
@@ -781,13 +754,50 @@ impl Parser {
     }
 
     pub fn parse_path(&mut self) -> Result<Path, ParseError> {
-        let mut path = Path { segments: vec![] };
-        while self.match_token(TokenKind::Name, 0)? {
-            path.segments.push(self.consume()?.value);
-            self.consume()?; // Skip ':' x2
+        let name = self.consume()?.value;
+        
+        let arguments;
+        if self.match_token(TokenKind::OpenParen, 0)? {
+            let mut args = vec![];
             self.consume()?;
+            while !self.match_token(TokenKind::CloseParen, 0)? {
+                args.push(self.parse_expression()?);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+            self.consume()?;
+            arguments = Some(args);
         }
-        Ok(path)
+        else { 
+            arguments = None;
+        }
+
+        let mut seperator: Option<String> = None;
+        if self.match_token(TokenKind::Dot, 0)? {
+            seperator = Some(".".to_string());
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                child: Some(Box::new(self.parse_path()?))
+            })
+        } else if self.match_token(TokenKind::Colon, 0)? {
+            seperator = Some("::".to_string());
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                child: Some(Box::new(self.parse_path()?))
+            })
+        } else {
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                child: None
+            })
+        }
     }
 
     pub fn is_variable_assignment(&self) -> Result<bool, ParseError> {

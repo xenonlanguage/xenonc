@@ -95,7 +95,10 @@ pub struct ModuleDeclaration {
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Path {
-    pub segments: Vec<String>,
+    pub name: String,
+    pub seperator: Option<String>,
+    pub arguments: Option<Vec<Expression>>,
+    pub child: Option<Box<Path>>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
@@ -104,17 +107,10 @@ pub struct Block {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub struct Identifier {
-    pub name: String,
-    pub arguments: Option<Vec<Expression>>,
-    pub child: Option<Box<Identifier>>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum Statement {
     VariableAssignment(VariableAssignment),
     VariableDeclaration(VariableDeclaration),
-    FunctionCall(Identifier),
+    FunctionCall(Path),
     ForLoop(ForLoop),
     IfStatement(IfStatement),
     LoopStatement(LoopStatement),
@@ -130,7 +126,7 @@ pub enum Statement {
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct VariableAssignment {
-    pub name: Identifier,
+    pub name: Path,
     pub operator: String,
     pub value: Expression,
 }
@@ -138,7 +134,7 @@ pub struct VariableAssignment {
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct ForLoop {
     pub name: String,
-    pub iterator: Identifier,
+    pub iterator: Path,
     pub body: Box<Statement>,
 }
 
@@ -202,10 +198,10 @@ pub enum Type {
 pub enum Expression {
     Parentheses(Box<Expression>),
     BinOp(BinOp),
-    FunctionCall(Identifier),
+    FunctionCall(Path),
     UnaryOperation(UnaryOperation),
     Literal(Literal),
-    Identifier(Identifier),
+    Identifier(Path),
     Cast(Cast),
     #[default]
     Null,
