@@ -43,6 +43,7 @@ pub struct FunctionDeclaration {
     pub is_async: bool,
     pub name: String,
     pub parameters: Vec<Parameter>,
+    pub type_parameters: Vec<String>,
     pub r#type: Option<Type>,
     pub body: Option<Block>,
 }
@@ -70,6 +71,7 @@ pub struct StructDeclaration {
     pub safety: Safety,
     pub is_abstract: bool,
     pub name: String,
+    pub type_arguments: Vec<String>,
     pub inherits: Vec<Path>,
     pub items: Vec<Either<FunctionDeclaration, VariableDeclaration>>,
 }
@@ -78,6 +80,7 @@ pub struct StructDeclaration {
 pub struct TraitDeclaration {
     pub visibility: Visibility,
     pub name: String,
+    pub type_arguments: Vec<String>,
     pub items: Vec<Either<FunctionDeclaration, VariableDeclaration>>,
 }
 
@@ -98,6 +101,7 @@ pub struct Path {
     pub name: String,
     pub seperator: Option<String>,
     pub arguments: Option<Vec<Expression>>,
+    pub type_arguments: Option<Vec<Type>>,
     pub child: Option<Box<Path>>,
 }
 

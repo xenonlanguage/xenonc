@@ -104,6 +104,7 @@ impl Parser {
             is_extern: false,
             name: "".to_string(),
             parameters: vec![],
+            type_parameters: vec![],
             safety: Safety::Safe,
             r#type: None,
             visibility: Visibility::Public,
@@ -137,6 +138,19 @@ impl Parser {
         self.consume()?; // Skip 'fn'
 
         function.name = self.consume()?.value;
+
+        if self.match_token(TokenKind::LessThan, 0)? {
+            self.consume()?;
+
+            while !self.match_token(TokenKind::GreaterThan, 0)? {
+                function.type_parameters.push(self.consume()?.value);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+
+            self.consume()?;
+        }
 
         self.consume()?; // Skip '('
 
@@ -512,6 +526,7 @@ impl Parser {
             inherits: vec![],
             is_abstract: false,
             name: "".to_string(),
+            type_arguments: vec![],
             safety: Safety::Safe,
             visibility: Visibility::Public,
         };
@@ -538,6 +553,19 @@ impl Parser {
         self.consume()?; // Skip 'struct' keyword
 
         struc.name = self.consume()?.value;
+
+        if self.match_token(TokenKind::LessThan, 0)? {
+            self.consume()?;
+
+            while !self.match_token(TokenKind::GreaterThan, 0)? {
+                struc.type_arguments.push(self.consume()?.value);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+
+            self.consume()?;
+        }
 
         if self.match_token(TokenKind::Colon, 0)? {
             self.consume()?; // Skip ':'
@@ -772,22 +800,46 @@ impl Parser {
         else { 
             arguments = None;
         }
+        
+        let mut targs: Option<Vec<Type>> = None;
+
+        if self.match_token(TokenKind::LessThan, 0)? {
+            self.consume()?;
+
+            let mut args = vec![];
+            
+            while !self.match_token(TokenKind::GreaterThan, 0)? {
+                args.push(self.parse_type()?);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+            
+            targs = Some(args);
+
+            self.consume()?;
+        }
 
         let mut seperator: Option<String> = None;
         if self.match_token(TokenKind::Dot, 0)? {
             seperator = Some(".".to_string());
+            self.consume()?;
             Ok(Path {
                 name,
                 seperator,
                 arguments,
+                type_arguments: targs,
                 child: Some(Box::new(self.parse_path()?))
             })
         } else if self.match_token(TokenKind::Colon, 0)? {
             seperator = Some("::".to_string());
+            self.consume()?;
+            self.consume()?;
             Ok(Path {
                 name,
                 seperator,
                 arguments,
+                type_arguments: targs,
                 child: Some(Box::new(self.parse_path()?))
             })
         } else {
@@ -795,6 +847,7 @@ impl Parser {
                 name,
                 seperator,
                 arguments,
+                type_arguments: targs,
                 child: None
             })
         }
@@ -841,6 +894,7 @@ impl Parser {
         let mut r#trait = TraitDeclaration {
             items: vec![],
             name: "".to_string(),
+            type_arguments: vec![],
             visibility: Visibility::Public,
         };
 
@@ -860,6 +914,19 @@ impl Parser {
         self.consume()?; // Skip 'trait'
 
         r#trait.name = self.consume()?.value;
+
+        if self.match_token(TokenKind::LessThan, 0)? {
+            self.consume()?;
+
+            while !self.match_token(TokenKind::GreaterThan, 0)? { 
+                r#trait.type_arguments.push(self.consume()?.value);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+
+            self.consume()?;
+        }
 
         self.consume()?; // Skip '{'
 

@@ -6,6 +6,7 @@ use std::fs;
 pub mod lexer;
 pub mod parser;
 pub mod ast;
+mod resolve;
 
 fn main() {
     let mut emits = EmitType::Ast;
