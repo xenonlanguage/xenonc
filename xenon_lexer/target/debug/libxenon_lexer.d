@@ -1,1 +1,0 @@
-C:\Users\Liam\ Greenway\RustroverProjects\xenon\xenon_lexer\target\debug\libxenon_lexer.rlib: C:\Users\Liam\ Greenway\RustroverProjects\xenon\xenon_lexer\src\lexer.rs C:\Users\Liam\ Greenway\RustroverProjects\xenon\xenon_lexer\src\lib.rs C:\Users\Liam\ Greenway\RustroverProjects\xenon\xenon_lexer\src\token.rs
