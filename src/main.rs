@@ -6,7 +6,6 @@ use std::fs;
 pub mod lexer;
 pub mod parser;
 pub mod ast;
-mod resolve;
 
 fn main() {
     let mut emits = EmitType::Ast;
@@ -29,12 +28,11 @@ fn main() {
 
     let code = fs::read_to_string(input.clone()).unwrap();
     let tokens = Lexer::new(code).tokenize().unwrap();
-    let ast = parser::Parser::new(tokens).parse_program(input).unwrap();
+    let ast = parser::Parser::new(tokens).parse_program(input.clone()).unwrap();
     if emits == EmitType::Ast {
         fs::write(format!("{}.ast", output), format!("{:#?}", ast)).unwrap();
+        return;
     }
-
-
 }
 
 #[derive(PartialEq)]

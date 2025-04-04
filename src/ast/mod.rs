@@ -1,5 +1,8 @@
+use std::fmt;
+use std::fmt::{Formatter};
 use either::Either;
-
+use enum_as_inner::EnumAsInner;
+use crate::ast::Literal::StringLiteral;
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum Safety {
@@ -21,7 +24,7 @@ pub struct Program {
     pub members: Vec<ProgramMember>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, EnumAsInner, PartialEq, PartialOrd)]
 pub enum ProgramMember {
     FunctionDeclaration(FunctionDeclaration),
     VariableDeclaration(VariableDeclaration),
@@ -41,9 +44,8 @@ pub struct FunctionDeclaration {
     pub is_override: bool,
     pub is_virtual: bool,
     pub is_async: bool,
-    pub name: String,
+    pub name: Path,
     pub parameters: Vec<Parameter>,
-    pub type_parameters: Vec<String>,
     pub r#type: Option<Type>,
     pub body: Option<Block>,
 }
@@ -96,13 +98,29 @@ pub struct ModuleDeclaration {
     pub items: Vec<ModuleMember>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd, Hash)]
 pub struct Path {
     pub name: String,
     pub seperator: Option<String>,
     pub arguments: Option<Vec<Expression>>,
     pub type_arguments: Option<Vec<Type>>,
     pub child: Option<Box<Path>>,
+}
+impl fmt::Display for Path {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        write!(fmt, "{}", self.name)?;
+        match self.seperator { 
+            Some(ref seperator) => write!(fmt, "{}", seperator)?,
+            None => (),
+        }
+        match self.type_arguments {
+            Some(ref type_arguments) => {
+                write!(fmt, "<{}>", type_arguments.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", "))?;
+            }
+            None => (),
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
@@ -184,12 +202,11 @@ pub enum ModuleMember {
     Null,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd, Hash)]
 pub enum Type {
     PointerType(Box<Type>),
     ReferenceType(Box<Type>),
     /// Inputs and output
-    FunctionRefType(Vec<Type>, Box<Type>),
     TupleType(Vec<Type>),
     PathType(Path),
     PrimativeType(String),
@@ -197,12 +214,46 @@ pub enum Type {
     #[default]
     Null,
 }
+impl fmt::Display for Type {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Type::PointerType(t) => {
+                write!(fmt, "*{}", t)?
+            }
+            Type::ReferenceType(t) => {
+                write!(fmt, "ref {}", t)?
+            }
+            Type::TupleType(t) => {
+                write!(fmt, "(")?;
+                if t.len() >= 1 {
+                    write!(fmt, "{}", t[0])?
+                }
+                for i in 0..t.len() {
+                    write!(fmt, ", {}", t[i])?
+                }
+                write!(fmt, ")")?;
+            }
+            Type::PathType(t) => {
+                write!(fmt, "{}", t)?
+            }
+            Type::PrimativeType(t) => {
+                write!(fmt, "{}", t)?
+            }
+            Type::ArrayType(t, l) => {
+                write!(fmt, "{}[{}]", t, l)?
+            }
+            Type::Null => {
+                write!(fmt, "null")?
+            }
+        }
+        Ok(())
+    }
+}
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd, Hash)]
 pub enum Expression {
     Parentheses(Box<Expression>),
     BinOp(BinOp),
-    FunctionCall(Path),
     UnaryOperation(UnaryOperation),
     Literal(Literal),
     Identifier(Path),
@@ -210,8 +261,37 @@ pub enum Expression {
     #[default]
     Null,
 }
+impl fmt::Display for Expression {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self { 
+            Expression::Parentheses(e) => {
+                write!(fmt, "({})", e)?;
+            }
+            Expression::BinOp(e) => {
+                write!(fmt, "({} {} {})", e.left, e.operator, e.right)?;
+            }
+            Expression::UnaryOperation(e) => {
+                write!(fmt, "{}{}", e.operator, e.expression)?;
+            }
+            Expression::Literal(e) => {
+                write!(fmt, "{}", e)?;
+            }
+            Expression::Identifier(e) => {
+                write!(fmt, "{}", e)?;
+            }
+            Expression::Cast(e) => {
+                write!(fmt, "{} as {}", e.left, e.right)?;
+            }
+            Expression::Null => {
+                write!(fmt, "null")?;
+            }
+        }
+        return Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Hash)]
 pub enum Literal {
     StringLiteral(String),
     IntegerLiteral(String),
@@ -223,8 +303,53 @@ pub enum Literal {
     #[default]
     Null,
 }
+impl fmt::Display for Literal {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self { 
+            Literal::StringLiteral(s) => {
+                write!(fmt, "\"{}\"", s)?;
+            }
+            Literal::IntegerLiteral(s) => {
+                write!(fmt, "{}", s)?;
+            }
+            Literal::FloatLiteral(s) => {
+                write!(fmt, "{}", s)?;
+            }
+            Literal::CharLiteral(s) => {
+                write!(fmt, "'{}'", s)?;
+            }
+            Literal::BooleanLiteral(s) => {
+                write!(fmt, "{}", s)?;
+            }
+            Literal::ArrayLiteral(s) => {
+                write!(fmt, "[")?;
+                if s.len() >= 1 {
+                    write!(fmt, "{}", s[0])?;
+                }
+                for i in 0..s.len() {
+                    write!(fmt, ", {}", s[i])?;
+                }
+                write!(fmt, "]")?;
+            }
+            Literal::TupleLiteral(s) => {
+                write!(fmt, "(")?;
+                if s.len() >= 1 {
+                    write!(fmt, "{}", s[0])?;
+                }
+                for i in 0..s.len() {
+                    write!(fmt, ", {}", s[i])?;
+                }
+                write!(fmt, ")")?;
+            }
+            Literal::Null => {
+                write!(fmt, "null")?;
+            }
+        }
+        Ok(())
+    }
+}
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd, Hash)]
 pub struct BinOp {
     pub left: Box<Expression>,
     pub operator: String,
@@ -232,12 +357,14 @@ pub struct BinOp {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Hash)]
 pub struct Cast {
     pub left: Box<Expression>,
     pub right: Type,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Hash)]
 pub struct UnaryOperation {
     pub operator: String,
     pub expression: Box<Expression>,

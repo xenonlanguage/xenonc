@@ -1,3 +1,9 @@
-public fn main<T>() -> Option<T> {
+module main {
+    public struct Option {
+        let x: i32;
+    }
 
+    public fn main() -> Option {
+        return 12;
+    }
 }
