@@ -1,17 +1,31 @@
-use either::Either;
+use std::{error, fmt};
+use std::fmt::format;
 use crate::ast::{
-    BinOp, Block, Case, Cast, Expression, ForLoop, FunctionDeclaration, Identifier, IfStatement,
+    BinOp, Block, Case, Cast, Expression, ForLoop, FunctionDeclaration, IfStatement,
     Literal, LoopStatement, ModuleDeclaration, ModuleMember, Parameter, Path, Program,
     ProgramMember, Statement, StructDeclaration, SwitchStatement, TraitDeclaration, Type,
     UnaryOperation, UseDeclaration, VariableAssignment, VariableDeclaration, WhileLoop,
 };
 use crate::ast::{Safety, Visibility};
 use crate::lexer::token::{Token, TokenKind};
+use either::Either;
+use function_name;
+use crate::lexer::token::TokenKind::ElseKw;
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct ParseError {
     pub message: String,
-    pub line: usize,
+    pub line: u32,
+    pub code_line: usize,
+}
+impl fmt::Display for ParseError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "Parse Error at line {}: {}", self.code_line, self.message)?;
+        if cfg!(debug_assertions) {
+            write!(fmt, "\nDEBUG: at line {}", self.line)?;
+        }
+        Ok(())
+    }
 }
 
 pub struct Parser {
@@ -32,7 +46,7 @@ impl Parser {
             members: vec![],
         };
 
-        while self.peek(0).is_ok() {
+        while self.position < self.tokens.len() {
             program.members.push(self.parse_program_member()?);
         }
 
@@ -88,7 +102,7 @@ impl Parser {
             TokenKind::ModuleKw => Ok(ProgramMember::ModuleDeclaration(
                 self.parse_module_declaration(modifiers)?,
             )),
-            _ => Err(self.gen_error("Unexpected token. Expected Program member.".to_string())),
+            _ => Err(self.gen_error(format!("While Parsing Program Member: Expected Program Member, found {:#?}", token.kind), line!())),
         }
     }
 
@@ -102,7 +116,14 @@ impl Parser {
             is_override: false,
             is_virtual: false,
             is_extern: false,
-            name: "".to_string(),
+            name: Path {
+                name: "".to_string(),
+                seperator: None,
+                arguments: None,
+                type_arguments: None,
+                accessor: Box::new(None),
+                child: None,
+            },
             parameters: vec![],
             safety: Safety::Safe,
             r#type: None,
@@ -130,13 +151,13 @@ impl Parser {
                 return Err(self.gen_error(format!(
                     "Modifier {:#?} is not valid for function declaration",
                     modifier
-                )));
+                ), line!()));
             }
         }
 
         self.consume()?; // Skip 'fn'
-
-        function.name = self.consume()?.value;
+        
+        function.name = self.parse_path_no_args()?;
 
         self.consume()?; // Skip '('
 
@@ -184,7 +205,22 @@ impl Parser {
         } else if self.match_token(TokenKind::OpenParen, 0)? {
             Ok(self.parse_tuple_type()?)
         } else if self.match_token(TokenKind::Name, 0)? {
-            Ok(Type::PathType(self.parse_path()?))
+            let path = self.parse_path_type() ?;
+            if self.match_token(TokenKind::OpenBracket, 0)? {
+                self.consume()?;
+                let literal: Option<Literal>;
+                if !self.match_token(TokenKind::CloseBracket, 0)? {
+                    literal = Some(self.parse_literal()?);
+                }
+                else {
+                    literal = None;
+                }
+                self.consume()?;
+                return Ok(Type::ArrayType(Box::new(Type::PathType(path)), literal));
+            }
+            else {
+                return Ok(Type::PathType(path));
+            }
         } else if self.match_token_array(
             &[
                 TokenKind::I8Kw,
@@ -206,7 +242,7 @@ impl Parser {
         )? {
             Ok(Type::PrimativeType(self.consume()?.value))
         } else {
-            Err(self.gen_error("Unexpected token. Expected type.".to_string()))
+            Err(self.gen_error("Unexpected token. Expected type.".to_string(), line!()))
         }
     }
 
@@ -252,7 +288,7 @@ impl Parser {
                 return Err(self.gen_error(format!(
                     "Modifier {:#?} is not valid for variable declaration",
                     modifier
-                )));
+                ), line!()));
             }
         }
 
@@ -325,22 +361,32 @@ impl Parser {
 
     pub fn parse_comparison_operator(&mut self) -> Result<String, ParseError> {
         if self.match_token(TokenKind::Equal, 0)? && self.match_token(TokenKind::Equal, 1)? {
+            self.consume()?;
+            self.consume()?;
             Ok("==".to_string())
         } else if self.match_token(TokenKind::Bang, 0)? && self.match_token(TokenKind::Equal, 0)? {
+            self.consume()?;
+            self.consume()?;
             Ok("!=".to_string())
         } else if self.match_token(TokenKind::LessThan, 0)? {
             if self.match_token(TokenKind::Equal, 1)? {
+                self.consume()?;
+                self.consume()?;
                 return Ok("<=".to_string());
             }
+            self.consume()?;
             Ok("<".to_string())
         } else if self.match_token(TokenKind::GreaterThan, 0)? {
             if self.match_token(TokenKind::Equal, 1)? {
+                self.consume()?;
+                self.consume()?;
                 return Ok(">=".to_string());
             }
+            self.consume()?;
             Ok(">".to_string())
         } else {
             Err(
-                self.gen_error("Unexpected token. Expected comparison operator.".to_string())
+                self.gen_error("Unexpected token. Expected comparison operator.".to_string(), line!())
             )
         }
     }
@@ -469,36 +515,9 @@ impl Parser {
         }
     }
 
-    pub fn parse_identifier(&mut self) -> Result<Identifier, ParseError> {
-        let mut identifier = Identifier {
-            name: self.consume()?.value,
-            arguments: None,
-            child: None,
-        };
-
-        if self.match_token(TokenKind::OpenParen, 0)? {
-            self.consume()?;
-            let mut args = vec![];
-            while !self.match_token(TokenKind::CloseParen, 0)? {
-                args.push(self.parse_expression()?);
-                if !self.match_token(TokenKind::CloseParen, 0)? {
-                    self.consume()?; // SKip ','
-                }
-            }
-            self.consume()?; // Skip ')'
-            identifier.arguments = Some(args);
-        }
-        if self.match_token(TokenKind::Dot, 0)? {
-            self.consume()?;
-            identifier.child = Some(Box::new(self.parse_identifier()?));
-        }
-
-        Ok(identifier)
-    }
-
     pub fn parse_primary(&mut self) -> Result<Expression, ParseError> {
         if self.match_token(TokenKind::Name, 0)? {
-            Ok(Expression::Identifier(self.parse_identifier()?))
+            Ok(Expression::Identifier(self.parse_path_no_generic()?))
         } else if self.match_token(TokenKind::OpenParen, 0)? {
             self.consume()?;
             let exp = self.parse_expression()?;
@@ -526,7 +545,7 @@ impl Parser {
         } else if self.match_token_array(&[TokenKind::TrueKw, TokenKind::FalseKw], 0)? {
             Ok(Literal::BooleanLiteral(self.consume()?.value == "true"))
         } else {
-            Err(self.gen_error("Unexpected token. Expected literal.".to_string()))
+            Err(self.gen_error("Unexpected token. Expected literal.".to_string(), line!()))
         }
     }
 
@@ -539,6 +558,7 @@ impl Parser {
             inherits: vec![],
             is_abstract: false,
             name: "".to_string(),
+            type_arguments: vec![],
             safety: Safety::Safe,
             visibility: Visibility::Public,
         };
@@ -558,13 +578,26 @@ impl Parser {
                 return Err(self.gen_error(format!(
                     "Modifier {:#?} is not valid for struct declaration",
                     modifier
-                )));
+                ), line!()));
             }
         }
 
         self.consume()?; // Skip 'struct' keyword
 
         struc.name = self.consume()?.value;
+
+        if self.match_token(TokenKind::LessThan, 0)? {
+            self.consume()?;
+
+            while !self.match_token(TokenKind::GreaterThan, 0)? {
+                struc.type_arguments.push(self.consume()?.value);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+
+            self.consume()?;
+        }
 
         if self.match_token(TokenKind::Colon, 0)? {
             self.consume()?; // Skip ':'
@@ -576,9 +609,10 @@ impl Parser {
 
         self.consume()?; // Skip '{'
 
-        let mut modifiers = self.parse_modifiers()?;
+        let mut modifiers: Vec<TokenKind>;
 
         while !self.match_token(TokenKind::CloseBrace, 0)? {
+            modifiers = self.parse_modifiers()?;
             match self.peek(0)?.kind {
                 TokenKind::FnKw => {
                     struc.items.push(Either::Left(
@@ -592,7 +626,7 @@ impl Parser {
                 }
                 _ => {
                     return Err(
-                        self.gen_error("Unexpected token. Expected Struct item.".to_string())
+                        self.gen_error("Unexpected token. Expected Struct item.".to_string(), line!())
                     );
                 }
             }
@@ -621,9 +655,10 @@ impl Parser {
     }
 
     pub fn parse_variable_assignment(&mut self) -> Result<VariableAssignment, ParseError> {
-        let name = self.parse_identifier()?;
+        let name = self.parse_path()?;
         let operator = self.parse_assignment_operator()?;
         let value = self.parse_expression()?;
+        self.consume()?; // Skip ';'
         Ok(VariableAssignment {
             name,
             operator,
@@ -635,7 +670,7 @@ impl Parser {
         self.consume()?; // SKip 'for'
         let name = self.consume()?.value;
         self.consume()?; // Skip 'in'
-        let iterator = self.parse_identifier()?;
+        let iterator = self.parse_path()?;
         Ok(ForLoop {
             name,
             iterator,
@@ -697,19 +732,22 @@ impl Parser {
             Ok("%=".to_string())
         } else {
             Err(
-                self.gen_error("Unexpected token. Expected assignment operator.".to_string())
+                self.gen_error("Unexpected token. Expected assignment operator.".to_string(), line!())
             )
         }
     }
 
     pub fn parse_statement(&mut self) -> Result<Statement, ParseError> {
-        if self.match_token(TokenKind::Name, 0)? {
+        if self.match_token(TokenKind::OpenBrace, 0)? { 
+            Ok(Statement::Block(self.parse_block()?))
+        } 
+        else if self.match_token(TokenKind::Name, 0)? {
             if self.is_variable_assignment()? {
                 Ok(Statement::VariableAssignment(
                     self.parse_variable_assignment()?,
                 ))
             } else {
-                let res = Ok(Statement::FunctionCall(self.parse_identifier()?));
+                let res = Ok(Statement::FunctionCall(self.parse_path()?));
                 self.consume()?; // SKip ';'
                 res
             }
@@ -730,21 +768,30 @@ impl Parser {
         } else if self.match_token(TokenKind::WhileKw, 0)? {
             Ok(Statement::WhileLoop(self.parse_while_loop()?))
         } else if self.match_token(TokenKind::ReturnKw, 0)? {
-            Ok(Statement::ReturnStatement(self.parse_return_statement()?))
+            let ret = Ok(Statement::ReturnStatement(self.parse_return_statement()?));
+            self.consume()?;
+            ret
         } else if self.match_token(TokenKind::ContinueKw, 0)? {
+            self.consume()?;
             self.consume()?;
             Ok(Statement::ContinueStatement)
         } else if self.match_token(TokenKind::BreakKw, 0)? {
             self.consume()?;
+            self.consume()?; // Skip ';'
             Ok(Statement::BreakStatement)
         } else {
-            Err(self.gen_error("Unexpected token. Expected statement.".to_string()))
+            Err(self.gen_error("Unexpected token. Expected statement.".to_string(), line!()))
         }
     }
 
-    pub fn parse_return_statement(&mut self) -> Result<Expression, ParseError> {
+    pub fn parse_return_statement(&mut self) -> Result<Option<Expression>, ParseError> {
         self.consume()?;
-        self.parse_expression()
+        if !self.match_token(TokenKind::Semicolon, 0)? {
+            Ok(Some(self.parse_expression()?))
+        }
+        else {
+            Ok(None)
+        }
     }
 
     pub fn parse_switch_statement(&mut self) -> Result<SwitchStatement, ParseError> {
@@ -781,15 +828,288 @@ impl Parser {
     }
 
     pub fn parse_path(&mut self) -> Result<Path, ParseError> {
-        let mut path = Path { segments: vec![] };
-        while self.match_token(TokenKind::Name, 0)? {
-            path.segments.push(self.consume()?.value);
-            self.consume()?; // Skip ':' x2
+        let name = self.consume()?.value;
+        
+        let mut targs: Option<Vec<Type>> = None;
+
+        if self.match_token(TokenKind::LessThan, 0)? {
+            self.consume()?;
+
+            let mut args = vec![];
+            
+            while !self.match_token(TokenKind::GreaterThan, 0)? {
+                args.push(self.parse_type()?);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+            
+            targs = Some(args);
+
             self.consume()?;
         }
-        Ok(path)
+
+        let arguments;
+        if self.match_token(TokenKind::OpenParen, 0)? {
+            let mut args = vec![];
+            self.consume()?;
+            while !self.match_token(TokenKind::CloseParen, 0)? {
+                args.push(self.parse_expression()?);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+            self.consume()?;
+            arguments = Some(args);
+        }
+        else {
+            arguments = None;
+        }
+        
+        let accessor: Option<Expression>;
+        if self.match_token(TokenKind::OpenBracket, 0)? {
+            self.consume()?;
+            accessor = Some(self.parse_expression()?);
+            self.consume()?;
+        }
+        else { 
+            accessor = None;
+        } 
+
+        let mut seperator: Option<String> = None;
+        if self.match_token(TokenKind::Dot, 0)? {
+            seperator = Some(".".to_string());
+            self.consume()?;
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(accessor),
+                child: Some(Box::new(self.parse_path()?))
+            })
+        } else if self.match_token(TokenKind::Colon, 0)? {
+            seperator = Some("::".to_string());
+            self.consume()?;
+            self.consume()?;
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(accessor),
+                child: Some(Box::new(self.parse_path()?))
+            })
+        } else {
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(accessor),
+                child: None
+            })
+        }
     }
 
+    pub fn parse_path_no_generic(&mut self) -> Result<Path, ParseError> {
+        let name = self.consume()?.value;
+
+        let mut targs: Option<Vec<Type>> = None;
+
+        let arguments;
+        if self.match_token(TokenKind::OpenParen, 0)? {
+            let mut args = vec![];
+            self.consume()?;
+            while !self.match_token(TokenKind::CloseParen, 0)? {
+                args.push(self.parse_expression()?);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+            self.consume()?;
+            arguments = Some(args);
+        }
+        else {
+            arguments = None;
+        }
+
+        let accessor: Option<Expression>;
+        if self.match_token(TokenKind::OpenBracket, 0)? {
+            self.consume()?;
+            accessor = Some(self.parse_expression()?);
+            self.consume()?;
+        }
+        else {
+            accessor = None;
+        }
+
+        let mut seperator: Option<String> = None;
+        if self.match_token(TokenKind::Dot, 0)? {
+            seperator = Some(".".to_string());
+            self.consume()?;
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(accessor),
+                child: Some(Box::new(self.parse_path()?))
+            })
+        } else if self.match_token(TokenKind::Colon, 0)? {
+            seperator = Some("::".to_string());
+            self.consume()?;
+            self.consume()?;
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(accessor),
+                child: Some(Box::new(self.parse_path()?))
+            })
+        } else {
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(accessor),
+                child: None
+            })
+        }
+    }
+    
+    pub fn parse_path_no_args(&mut self) -> Result<Path, ParseError> {
+        let name = self.consume()?.value;
+
+        let mut targs: Option<Vec<Type>> = None;
+
+        if self.match_token(TokenKind::LessThan, 0)? {
+            self.consume()?;
+
+            let mut args = vec![];
+
+            while !self.match_token(TokenKind::GreaterThan, 0)? {
+                args.push(self.parse_type()?);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+
+            targs = Some(args);
+
+            self.consume()?;
+        }
+
+        let accessor: Option<Expression>;
+        if self.match_token(TokenKind::OpenBracket, 0)? {
+            self.consume()?;
+            accessor = Some(self.parse_expression()?);
+            self.consume()?;
+        }
+        else {
+            accessor = None;
+        }
+
+        let arguments: Option<Vec<Expression>> = None;
+
+        let mut seperator: Option<String> = None;
+        if self.match_token(TokenKind::Dot, 0)? {
+            seperator = Some(".".to_string());
+            self.consume()?;
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(accessor),
+                child: Some(Box::new(self.parse_path()?))
+            })
+        } else if self.match_token(TokenKind::Colon, 0)? {
+            seperator = Some("::".to_string());
+            self.consume()?;
+            self.consume()?;
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(accessor),
+                child: Some(Box::new(self.parse_path()?))
+            })
+        } else {
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(accessor),
+                child: None
+            })
+        }
+    }
+
+    pub fn parse_path_type(&mut self) -> Result<Path, ParseError> {
+        let name = self.consume()?.value;
+
+        let mut targs: Option<Vec<Type>> = None;
+
+        if self.match_token(TokenKind::LessThan, 0)? {
+            self.consume()?;
+
+            let mut args = vec![];
+
+            while !self.match_token(TokenKind::GreaterThan, 0)? {
+                args.push(self.parse_type()?);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+
+            targs = Some(args);
+
+            self.consume()?;
+        }
+
+        let arguments: Option<Vec<Expression>> = None;
+
+        let mut seperator: Option<String> = None;
+        if self.match_token(TokenKind::Dot, 0)? {
+            seperator = Some(".".to_string());
+            self.consume()?;
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(None),
+                child: Some(Box::new(self.parse_path()?))
+            })
+        } else if self.match_token(TokenKind::Colon, 0)? {
+            seperator = Some("::".to_string());
+            self.consume()?;
+            self.consume()?;
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(None),
+                child: Some(Box::new(self.parse_path()?))
+            })
+        } else {
+            Ok(Path {
+                name,
+                seperator,
+                arguments,
+                type_arguments: targs,
+                accessor: Box::new(None),
+                child: None
+            })
+        }
+    }
+    
     pub fn is_variable_assignment(&self) -> Result<bool, ParseError> {
         let mut offset = 0;
 
@@ -831,6 +1151,7 @@ impl Parser {
         let mut r#trait = TraitDeclaration {
             items: vec![],
             name: "".to_string(),
+            type_arguments: vec![],
             visibility: Visibility::Public,
         };
 
@@ -843,13 +1164,26 @@ impl Parser {
                 return Err(self.gen_error(format!(
                     "Modifier {:#?} is not valid for trait declaration",
                     modifier
-                )));
+                ), line!()));
             }
         }
 
         self.consume()?; // Skip 'trait'
 
         r#trait.name = self.consume()?.value;
+
+        if self.match_token(TokenKind::LessThan, 0)? {
+            self.consume()?;
+
+            while !self.match_token(TokenKind::GreaterThan, 0)? { 
+                r#trait.type_arguments.push(self.consume()?.value);
+                if self.match_token(TokenKind::Comma, 0)? {
+                    self.consume()?;
+                }
+            }
+
+            self.consume()?;
+        }
 
         self.consume()?; // Skip '{'
 
@@ -888,7 +1222,7 @@ impl Parser {
                 }
                 _ => {
                     return Err(
-                        self.gen_error("Unexpected token. Expected Struct item.".to_string())
+                        self.gen_error("Unexpected token. Expected Struct item.".to_string(), line!())
                     );
                 }
             }
@@ -920,14 +1254,16 @@ impl Parser {
         modifiers: Vec<TokenKind>,
     ) -> Result<UseDeclaration, ParseError> {
         if !modifiers.is_empty() {
-            return Err(self.gen_error("Use declaration cannot have modifiers".to_string()));
+            return Err(self.gen_error("Use declaration cannot have modifiers".to_string(), line!()));
         }
 
         self.consume()?; // Skip 'use'
 
-        Ok(UseDeclaration {
+        let res = Ok(UseDeclaration {
             path: self.parse_path()?,
-        })
+        });
+        self.consume()?; // Skip ';'
+        res
     }
 
     pub fn parse_module_declaration(
@@ -949,17 +1285,21 @@ impl Parser {
                 return Err(self.gen_error(format!(
                     "Modifier {:#?} is not valid for module declaration",
                     modifier
-                )));
+                ), line!()));
             }
         }
 
         self.consume()?; // Skip 'module'
 
+        module.name = self.consume()?.value;
+        
         self.consume()?; // Skip '{'
 
         let mut modifiers = self.parse_modifiers()?;
 
         while !self.match_token(TokenKind::CloseBrace, 0)? {
+            modifiers = self.parse_modifiers()?;
+
             match self.peek(0)?.kind {
                 TokenKind::LetKw => {
                     module.items.push(ModuleMember::VariableDeclaration(
@@ -993,13 +1333,15 @@ impl Parser {
                 }
                 _ => {
                     return Err(
-                        self.gen_error("Unexpected token. Expected Struct item.".to_string())
+                        self.gen_error("Unexpected token. Expected Module item.".to_string(), line!())
                     );
                 }
             }
-
+            
             modifiers.clear();
         }
+
+        self.consume()?;
 
         Ok(module)
     }
@@ -1029,20 +1371,23 @@ impl Parser {
 
     pub fn peek(&self, offset: usize) -> Result<Token, ParseError> {
         if self.position + offset >= self.tokens.len() {
-            Err(self.gen_error("Unexpected end of file".to_string()))
+            return Err(self.gen_error("Unexpected end of file".to_string(), line!()));
         } else {
             Ok(self.tokens[self.position + offset].clone())
         }
     }
 
-    pub fn gen_error(&self, message: String) -> ParseError {
+    pub fn gen_error(&self, message: String, line: u32) -> ParseError {
         let mut pos = self.position;
         while pos >= self.tokens.len() {
             pos -= 1;
         }
-        ParseError {
+        let error = ParseError {
             message,
-            line: self.tokens[pos].line,
-        }
+            code_line: self.tokens[pos].line,
+            line,
+        };
+        logex::log_error(format!("{}", error).as_str());
+        return error;
     }
 }
