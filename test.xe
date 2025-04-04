@@ -1,9 +1,56 @@
-module main {
-    public struct Option {
-        let x: i32;
+module test {
+    use core::io;
+    
+    private let GlobalCounter: i32 = 0;
+    
+    public fn main(args: ref String[]) -> i32 {
+        GlobalCounter += 15;
+        let localCounter: u32 = 12;
+        if GlobalCounter < 20 {
+            main(args);
+        }
+        else {
+        
+        }
+        for arg in args {
+            io::println("{}", arg);
+        }
+        loop {
+            break;
+        }
+        switch args[0] {
+            case "hello" {
+                return;
+            }
+        }
+        unsafe {
+            io::println("Ich bin unsicher!");
+        }
+        while GlobalCounter < 50 {
+            main(args);
+            continue;
+        }
+        return 0;
     }
-
-    public fn main() -> Option {
-        return 12;
+    
+    module submain {
+        public fn submain() -> void {
+            return;
+        }
+    }
+    
+    public struct IpV4: IpAddress {
+        public let field1: u8;
+        public let field2: u8;
+        public let field3: u8;
+        public let field4: u8;
+        
+        public fn connect() {
+            io::println("Connecting");
+        }
+    }
+    
+    public trait IpAddress {
+        public fn connect();
     }
 }

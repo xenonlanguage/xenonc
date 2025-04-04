@@ -104,6 +104,8 @@ pub struct Path {
     pub seperator: Option<String>,
     pub arguments: Option<Vec<Expression>>,
     pub type_arguments: Option<Vec<Type>>,
+    /// Where in an array to access, if any
+    pub accessor: Box<Option<Expression>>,
     pub child: Option<Box<Path>>,
 }
 impl fmt::Display for Path {
@@ -130,6 +132,7 @@ pub struct Block {
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum Statement {
+    Block(Block),
     VariableAssignment(VariableAssignment),
     VariableDeclaration(VariableDeclaration),
     FunctionCall(Path),
@@ -139,7 +142,7 @@ pub enum Statement {
     SwitchStatement(SwitchStatement),
     UnsafeBlock(Block),
     WhileLoop(WhileLoop),
-    ReturnStatement(Expression),
+    ReturnStatement(Option<Expression>),
     ContinueStatement,
     BreakStatement,
     #[default]
@@ -210,7 +213,7 @@ pub enum Type {
     TupleType(Vec<Type>),
     PathType(Path),
     PrimativeType(String),
-    ArrayType(Box<Type>, Literal),
+    ArrayType(Box<Type>, Option<Literal>),
     #[default]
     Null,
 }
@@ -240,7 +243,7 @@ impl fmt::Display for Type {
                 write!(fmt, "{}", t)?
             }
             Type::ArrayType(t, l) => {
-                write!(fmt, "{}[{}]", t, l)?
+                write!(fmt, "{}[{:#?}]", t, l)?
             }
             Type::Null => {
                 write!(fmt, "null")?
