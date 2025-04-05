@@ -1,3 +1,5 @@
+mod mod_new;
+
 use std::{error, fmt};
 use std::fmt::format;
 use crate::ast::{
@@ -78,7 +80,7 @@ impl Parser {
         Ok(modifiers)
     }
 
-    pub fn parse_program_member(&mut self) -> Result<ProgramMember, ParseError> {
+    pub fn  parse_program_member(&mut self) -> Result<ProgramMember, ParseError> {
         let modifiers = self.parse_modifiers()?;
 
         let token = self.peek(0)?;
