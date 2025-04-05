@@ -1,3 +1,5 @@
+mod mod_new;
+
 use std::fmt;
 use std::fmt::{Formatter};
 use either::Either;
