@@ -111,6 +111,7 @@ impl Lexer {
                     "self" => TokenKind::SelfKw,
                     "import" => TokenKind::ImportKw,
                     "tank" => TokenKind::TankKw,
+                    "enum" => TokenKind::EnumKw,
                     "struct" => TokenKind::StructKw,
                     "unsafe" => TokenKind::UnsafeKw,
                     "use" => TokenKind::UseKw,

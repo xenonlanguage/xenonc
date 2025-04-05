@@ -24,7 +24,8 @@ pub struct Tank {
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum Item {
     ImportTank(Identifier),
-    Use(UseTree),
+    Use(Path),
+    Variable(VariableDeclaration),
     Function(Function),
     Module(Module),
     Enum(Enum),
@@ -84,21 +85,6 @@ pub struct Variant {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub struct UseTree {
-    pub prefix: Path,
-    pub kind: UseTreeKind
-}
-
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub enum UseTreeKind {
-    Simple(Identifier),
-    Nested(Vec<UseTree>),
-    Glob,
-    #[default]
-    Null,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Function {
     pub visibility: Visibility,
     pub safety: Safety,
@@ -123,12 +109,12 @@ pub enum Statement {
     Block(Block),
     Declaration(VariableDeclaration),
     Assignment(VariableAssignment),
-    Call(Identifier, Vec<Expression>),
-    If(Expression, Box<Block>, Option<Box<Block>>),
+    Call(Access),
+    If(IfStatement),
     Switch(SwitchStatement),
-    While(Expression, Box<Block>),
+    While(WhileStatement),
     Loop(Box<Block>),
-    For(Identifier, Expression, Box<Block>),
+    For(ForLoop),
     Return(Option<Expression>),
     Break,
     Continue,
@@ -137,7 +123,35 @@ pub enum Statement {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub struct WhileStatement {
+    pub condition: Expression,
+    pub body: Block,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub struct IfStatement {
+    pub condition: Expression,
+    pub body: Box<Statement>,
+    pub else_body: Option<Box<Statement>>
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub struct ForLoop {
+    pub name: Identifier,
+    pub iterator: Expression,
+    pub body: Block,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub struct Access {
+    pub path: Path,
+    pub arguments: Option<Vec<Expression>>,
+    pub child: Option<Box<Access>>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct VariableDeclaration {
+    pub attributes: Vec<Attribute>,
     pub visibility: Visibility,
     pub safety: Safety,
     pub is_const: bool,
@@ -148,7 +162,7 @@ pub struct VariableDeclaration {
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct VariableAssignment {
-    pub name: Path,
+    pub name: Access,
     pub operator: AssignmentOperator,
     pub value: Expression,
 }
@@ -173,14 +187,15 @@ pub struct Parameter {
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Module {
     pub attributes: Vec<Attribute>,
+    pub visibility: Visibility,
     pub name: Identifier,
     pub items: Vec<Item>
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Attribute {
-    pub name: String,
-    pub value: Option<String>,
+    pub name: Path,
+    pub value: Option<Path>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
@@ -209,8 +224,7 @@ pub struct PathSegment {
 pub enum Expression {
     Array(Vec<Expression>),
     Struct(Path, Vec<StructParam>),
-    Identifier(Identifier),
-    Call(Identifier, Vec<Expression>),
+    Access(Access),
     BinaryOp(BinaryOp),
     Cast(Cast),
     UnaryOp(UnaryOp),

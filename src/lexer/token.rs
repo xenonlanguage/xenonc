@@ -1,5 +1,5 @@
 /// The kind of token
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
 pub enum TokenKind {
     Number,
     String,
@@ -26,6 +26,7 @@ pub enum TokenKind {
     InternalKw,
     ImportKw,
     TankKw,
+    EnumKw,
     RefKw,
     ReturnKw,
     SelfKw,
