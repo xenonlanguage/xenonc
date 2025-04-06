@@ -171,7 +171,10 @@ impl Lexer {
                     "*" => TokenKind::Star,
                     "/" => TokenKind::Slash,
                     "%" => TokenKind::Percent,
-                    _ => TokenKind::Unknown,
+                    _ => {
+                        logex::log_error(format!("Unknown Token '{}'", buffer).as_str());
+                        TokenKind::Unknown
+                    }
                 };
                 token.end_col = self.column;
                 token.value = buffer.clone();

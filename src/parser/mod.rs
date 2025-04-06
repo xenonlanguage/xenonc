@@ -1,6 +1,5 @@
-use crate::ast::{Access, AssignmentOperator, Attribute, BinaryOp, BinaryOperator, Block, Case, Cast, Enum, Expression, ForLoop, Function, Identifier, IfStatement, Item, Literal, Module, Parameter, Path, PathSegment, Safety, Statement, Struct, SwitchStatement, Tank, Trait, Type, UnaryOp, UnaryOperator, VariableAssignment, VariableDeclaration, Variant, Visibility, WhileStatement};
+use crate::ast::{Access, AssignmentOperator, Attribute, BinaryOp, BinaryOperator, Block, Case, Cast, Enum, Expression, ForLoop, Function, Identifier, IfStatement, Item, Literal, Module, Parameter, Path, PathSegment, Safety, Statement, Struct, StructField, Switch, Tank, Trait, TraitField, Type, UnaryOp, UnaryOperator, VariableAssignment, VariableDeclaration, Variant, Visibility, WhileStatement};
 use crate::lexer::token::{Token, TokenKind};
-use either::{Left, Right};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParseError {
@@ -19,19 +18,18 @@ pub struct Parser {
 }
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Parser {
-        return Parser {
+        Parser {
             tokens,
             index: 0,
         }
     }
     
     pub fn parse(&mut self, tank_name: String) -> Result<Tank, ParseError> {
-        let mut tank = Tank::default();
-        tank.name = tank_name;
+        let mut tank = Tank::new(tank_name);
         while self.index < self.tokens.len() {
             tank.items.push(self.parse_item()?);
         }
-        return Ok(tank);
+        Ok(tank)
     }
     
     pub fn parse_attributes(&mut self) -> Result<Vec<Attribute>, ParseError> {
@@ -49,48 +47,48 @@ impl Parser {
             self.consume()?;
             attributes.push(attr);
         }
-        return Ok(attributes);
+        Ok(attributes)
     }
     
     pub fn parse_item(&mut self) -> Result<Item, ParseError> {
         let attributes = self.parse_attributes()?;
         let modifiers = self.parse_modifiers()?;
-        match self.peek(0)?.kind { 
+        match self.peek(0)?.kind {
             TokenKind::ImportKw => {
                 self.consume()?; // Skip 'import'
                 self.consume()?; // Skip 'tank'
-                let val =  Ok(Item::ImportTank(Identifier {
+                let val = Ok(Item::ImportTank(Identifier {
                     name: self.consume()?.value
                 }));
                 self.consume()?; // Skip ';'
-                return val;
+                val
             }
             TokenKind::UseKw => {
                 self.consume()?;
                 let path = self.parse_path()?;
                 self.consume()?; // Skip ';'
-                return Ok(Item::Use(path));
+                Ok(Item::Use(path))
             }
             TokenKind::LetKw => {
-                return Ok(Item::Variable(self.parse_variable_declaration(attributes, modifiers)?));
+                Ok(Item::Variable(self.parse_variable_declaration(attributes, modifiers)?))
             }
             TokenKind::FnKw => {
-                return Ok(Item::Function(self.parse_function(attributes, modifiers)?));
+                Ok(Item::Function(self.parse_function(attributes, modifiers)?))
             }
             TokenKind::ModuleKw => {
-                return Ok(Item::Module(self.parse_module(attributes, modifiers)?));
+                Ok(Item::Module(self.parse_module(attributes, modifiers)?))
             }
             TokenKind::EnumKw => {
-                return Ok(Item::Enum(self.parse_enum(attributes, modifiers)?));
+                Ok(Item::Enum(self.parse_enum(attributes, modifiers)?))
             }
             TokenKind::StructKw => {
-                return Ok(Item::Struct(self.parse_struct(attributes, modifiers)?));
+                Ok(Item::Struct(self.parse_struct(attributes, modifiers)?))
             }
             TokenKind::TraitKw => {
-                return Ok(Item::Trait(self.parse_trait(attributes, modifiers)?));
+                Ok(Item::Trait(self.parse_trait(attributes, modifiers)?))
             }
             _ => {
-                return Err(self.gen_error("Invalid item"));
+                Err(self.gen_error("Invalid item"))
             }
         }
     }
@@ -139,11 +137,11 @@ impl Parser {
         
         self.consume()?; // Skip ';'
         
-        return Ok(variable);
+        Ok(variable)
     }
     
     pub fn parse_expression(&mut self) -> Result<Expression, ParseError> {
-        return self.parse_or_expr();
+        self.parse_or_expr()
     }
 
     pub fn parse_or_expr(&mut self) -> Result<Expression, ParseError> {
@@ -392,7 +390,7 @@ impl Parser {
             }))
         }
         else {
-            return Ok(self.parse_primary()?);
+            return self.parse_primary();
         }
     }
 
@@ -411,28 +409,22 @@ impl Parser {
     
     pub fn parse_literal(&mut self) -> Result<Literal, ParseError> {
         if self.match_token(TokenKind::TrueKw, 0)? {
-            return Ok(Literal::Boolean(true))
-        }
-        else if self.match_token(TokenKind::FalseKw, 0)? {
-            return Ok(Literal::Boolean(false))
-        }
-        else if self.match_token(TokenKind::Char, 0)? {
-            return Ok(Literal::Char(self.consume()?.value.chars().next().unwrap()))
-        }
-        else if self.match_token(TokenKind::String, 0)? {
-            return Ok(Literal::String(self.consume()?.value))
-        }
-        else if self.match_token(TokenKind::Number, 0)? {
+            Ok(Literal::Boolean(true))
+        } else if self.match_token(TokenKind::FalseKw, 0)? {
+            Ok(Literal::Boolean(false))
+        } else if self.match_token(TokenKind::Char, 0)? {
+            Ok(Literal::Char(self.consume()?.value.chars().next().unwrap()))
+        } else if self.match_token(TokenKind::String, 0)? {
+            Ok(Literal::String(self.consume()?.value))
+        } else if self.match_token(TokenKind::Number, 0)? {
             let val = self.consume()?.value;
             if val.contains('.') {
-                return Ok(Literal::Float(val))
+                Ok(Literal::Float(val))
+            } else {
+                Ok(Literal::Integer(val))
             }
-            else {
-                return Ok(Literal::Integer(val))
-            }
-        }
-        else {
-            return Err(self.gen_error("Invalid literal"));
+        } else {
+            Err(self.gen_error("Invalid literal"))
         }
     }
     
@@ -477,7 +469,7 @@ impl Parser {
         Ok(var)
     }
     
-    pub fn parse_if_statenment(&mut self) -> Result<IfStatement, ParseError> {
+    pub fn parse_if_statement(&mut self) -> Result<IfStatement, ParseError> {
         let mut i = IfStatement::default();
         self.consume()?;
         i.condition = self.parse_expression()?;
@@ -486,11 +478,11 @@ impl Parser {
             self.consume()?;
             i.else_body = Some(Box::new(self.parse_statement()?));
         }
-        return Ok(i);
+        Ok(i)
     }
     
-    pub fn parse_switch_statement(&mut self) -> Result<SwitchStatement, ParseError> {
-        let mut switch = SwitchStatement::default();
+    pub fn parse_switch_statement(&mut self) -> Result<Switch, ParseError> {
+        let mut switch = Switch::default();
         self.consume()?;
         switch.expression = self.parse_expression()?;
         self.consume()?;
@@ -498,82 +490,78 @@ impl Parser {
             switch.cases.push(self.parse_case()?);
         }
         self.consume()?;
-        return Ok(switch);
+        Ok(switch)
     }
 
     pub fn parse_case(&mut self) -> Result<Case, ParseError> {
         let mut case = Case::default();
         self.consume()?;
         case.value = Some(self.parse_expression()?);
-        self.consume()?;
         case.body = self.parse_block()?;
-        self.consume()?;
-        return Ok(case);
+        Ok(case)
     }
     
     pub fn parse_statement(&mut self) -> Result<Statement, ParseError> {
         if self.match_token(TokenKind::OpenBrace, 0)? {
-            return Ok(Statement::Block(self.parse_block()?));
+            Ok(Statement::Block(self.parse_block()?))
         }
         else if self.match_token(TokenKind::LetKw, 0)? {
-            return Ok(Statement::Declaration(self.parse_variable_declaration(vec![], vec![])?));
-        }
-        else if self.match_token(TokenKind::Name, 0)? {
-            if self.variable_assignment()? {
-                return Ok(Statement::Assignment(self.parse_variable_assignment()?));
-            }
-            else { 
-                return Ok(Statement::Call(self.parse_access()?));
-            }
-        }
-        else if self.match_token(TokenKind::IfKw, 0)? {
-            return Ok(Statement::If(self.parse_if_statenment()?));
-        }
-        else if self.match_token(TokenKind::SwitchKw, 0)? {
-            return Ok(Statement::Switch(self.parse_switch_statement()?))
-        }
-        else if self.match_token(TokenKind::WhileKw, 0)? {
-            return Ok(Statement::While(self.parse_while_statement()?))
-        }
-        else if self.match_token(TokenKind::LoopKw, 0)? {
+            Ok(Statement::Declaration(self.parse_variable_declaration(vec![], vec![])?))
+        } else if self.match_token(TokenKind::UnsafeKw, 0)? {
             self.consume()?;
-            return Ok(Statement::Loop(Box::new(self.parse_block()?)))
-        }
-        else if self.match_token(TokenKind::ForKw, 0)? {
-            return Ok(Statement::For(self.parse_for_loop()?))
-        }
-        else if self.match_token(TokenKind::ReturnKw, 0)? {
+            Ok(Statement::Unsafe(self.parse_block()?))
+        } else if self.match_token(TokenKind::Name, 0)? {
+            if self.variable_assignment()? {
+                Ok(Statement::Assignment(self.parse_variable_assignment()?))
+            } else {
+                let call = Ok(Statement::Call(self.parse_access()?));
+                self.consume()?;
+                call
+            }
+        } else if self.match_token(TokenKind::IfKw, 0)? {
+            Ok(Statement::If(self.parse_if_statement()?))
+        } else if self.match_token(TokenKind::SwitchKw, 0)? {
+            Ok(Statement::Switch(self.parse_switch_statement()?))
+        } else if self.match_token(TokenKind::WhileKw, 0)? {
+            Ok(Statement::While(self.parse_while_statement()?))
+        } else if self.match_token(TokenKind::LoopKw, 0)? {
+            self.consume()?;
+            Ok(Statement::Loop(Box::new(self.parse_block()?)))
+        } else if self.match_token(TokenKind::ForKw, 0)? {
+            Ok(Statement::For(self.parse_for_loop()?))
+        } else if self.match_token(TokenKind::ReturnKw, 0)? {
             self.consume()?;
             if self.match_token(TokenKind::Semicolon, 0)? {
-                return Ok(Statement::Return(None));
+                self.consume()?;
+                Ok(Statement::Return(None))
+            } else {
+                let ret = Ok(Statement::Return(Some(self.parse_expression()?)));
+                self.consume()?;
+                ret
             }
-            else {
-                return Ok(Statement::Return(Some(self.parse_expression()?)));
-            }
-        }
-        else if self.match_token(TokenKind::ContinueKw, 0)? {
+        } else if self.match_token(TokenKind::ContinueKw, 0)? {
             self.consume()?;
-            return Ok(Statement::Continue);
-        }
-        else if self.match_token(TokenKind::BreakKw, 0)? {
             self.consume()?;
-            return Ok(Statement::Break);
-        }
-        else {
-            return Err(self.gen_error("Invalid statement"));
+            Ok(Statement::Continue)
+        } else if self.match_token(TokenKind::BreakKw, 0)? {
+            self.consume()?;
+            self.consume()?;
+            Ok(Statement::Break)
+        } else {
+            Err(self.gen_error("Invalid statement"))
         }
     }
     
     pub fn parse_while_statement(&mut self) -> Result<WhileStatement, ParseError> {
-        let mut whil = WhileStatement::default();
+        let mut r#while = WhileStatement::default();
         self.consume()?;
-        whil.condition = self.parse_expression()?;
-        whil.body = self.parse_block()?;
-        return Ok(whil);
+        r#while.condition = self.parse_expression()?;
+        r#while.body = self.parse_block()?;
+        Ok(r#while)
     }
 
     pub fn parse_access(&mut self) -> Result<Access, ParseError> {
-        let path = self.parse_path()?;
+        let path = self.parse_path_no_args()?;
         
         let args: Option<Vec<Expression>>;
         
@@ -586,24 +574,35 @@ impl Parser {
                     self.consume()?;
                 }
             }
+            self.consume()?;
             args = Some(a);
         }
         else {
             args = None
         }
-        if self.match_token(TokenKind::Dot, 0)? {
+        let i: Option<Expression>;
+        if self.match_token(TokenKind::OpenBracket, 0)? {
             self.consume()?;
-            return Ok(Access {
-                path,
-                arguments: args,
-                child: Some(Box::new(self.parse_access()?))
-            })
+            i = Some(self.parse_expression()?);
+            self.consume()?;
         }
         else {
-            return Ok(Access {
+            i = None;
+        }
+        if self.match_token(TokenKind::Dot, 0)? {
+            self.consume()?;
+            Ok(Access {
                 path,
                 arguments: args,
-                child: None
+                child: Some(Box::new(self.parse_access()?)),
+                index: Box::new(i),
+            })
+        } else {
+            Ok(Access {
+                path,
+                arguments: args,
+                child: None,
+                index: Box::new(i),
             })
         }
     }
@@ -681,10 +680,10 @@ impl Parser {
             let modifiers = self.parse_modifiers()?;
             match self.peek(0)?.kind {
                 TokenKind::LetKw => {
-                    r#trait.fields.push(Right(self.parse_variable_declaration(attributes, modifiers)?));
+                    r#trait.fields.push(TraitField::Variable(self.parse_variable_declaration(attributes, modifiers)?));
                 }
                 TokenKind::FnKw => {
-                    r#trait.fields.push(Left(self.parse_function(attributes, modifiers)?));
+                    r#trait.fields.push(TraitField::Function(self.parse_function(attributes, modifiers)?));
                 }
                 _ => {
                     return Err(self.gen_error("Invalid trait member"));
@@ -694,7 +693,7 @@ impl Parser {
 
         self.consume()?;
         
-        return Ok(r#trait);
+        Ok(r#trait)
     }
     
     pub fn parse_struct(&mut self, attributes: Vec<Attribute>, modifiers: Vec<TokenKind>) -> Result<Struct, ParseError> {
@@ -732,6 +731,13 @@ impl Parser {
         
         struc.name = self.parse_identifier()?;
         
+        if self.match_token(TokenKind::Colon, 0)? {
+            self.consume()?;
+            while !self.match_token(TokenKind::OpenBrace, 0)? {
+                struc.parents.push(self.parse_type()?);
+            }
+        }
+        
         self.consume()?;
 
         while !self.match_token(TokenKind::CloseBrace, 0)? {
@@ -739,10 +745,10 @@ impl Parser {
             let modifiers = self.parse_modifiers()?;
             match self.peek(0)?.kind { 
                 TokenKind::LetKw => {
-                    struc.fields.push(Right(self.parse_variable_declaration(attributes, modifiers)?));
+                    struc.fields.push(StructField::Variable(self.parse_variable_declaration(attributes, modifiers)?));
                 }
                 TokenKind::FnKw => {
-                    struc.fields.push(Left(self.parse_function(attributes, modifiers)?));
+                    struc.fields.push(StructField::Function(self.parse_function(attributes, modifiers)?));
                 }
                 _ => {
                     return Err(self.gen_error("Invalid struct member"));
@@ -752,7 +758,7 @@ impl Parser {
         
         self.consume()?;
         
-        return Ok(struc);
+        Ok(struc)
     }
     
     pub fn parse_enum(&mut self, attributes: Vec<Attribute>, modifiers: Vec<TokenKind>) -> Result<Enum, ParseError> {
@@ -795,7 +801,7 @@ impl Parser {
         
         self.consume()?;
         
-        return Ok(r#enum);
+        Ok(r#enum)
     }
     
     pub fn parse_variant(&mut self) -> Result<Variant, ParseError> {
@@ -815,7 +821,7 @@ impl Parser {
             self.consume()?;
         }
         
-        return Ok(variant);
+        Ok(variant)
     }
     
     pub fn parse_function(&mut self, attributes: Vec<Attribute>,  modifiers: Vec<TokenKind>) -> Result<Function, ParseError> {
@@ -882,7 +888,7 @@ impl Parser {
             function.body = Some(self.parse_block()?);
         }
         
-        return Ok(function);
+        Ok(function)
     }
     
     pub fn parse_block(&mut self) -> Result<Block, ParseError> {
@@ -896,7 +902,7 @@ impl Parser {
         
         self.consume()?;
         
-        return Ok(block);
+        Ok(block)
     }
     
     pub fn parse_generic_args(&mut self) -> Result<Vec<Identifier>, ParseError> {
@@ -913,7 +919,7 @@ impl Parser {
         
         self.consume()?;
         
-        return Ok(args);
+        Ok(args)
     }
     
     pub fn parse_parameter(&mut self) -> Result<Parameter, ParseError> {
@@ -929,7 +935,7 @@ impl Parser {
             self.consume()?;
         }
         
-        return Ok(param);
+        Ok(param)
     }
     
     pub fn parse_module(&mut self, attributes: Vec<Attribute>, modifiers: Vec<TokenKind>) -> Result<Module, ParseError> {
@@ -965,7 +971,7 @@ impl Parser {
         
         self.consume()?;
         
-        return Ok(module);
+        Ok(module)
     }
     
     pub fn parse_path(&mut self) -> Result<Path, ParseError> {
@@ -988,7 +994,24 @@ impl Parser {
             path.segments.push(segment);
         }
         
-        return Ok(path);
+        Ok(path)
+    }
+
+    pub fn parse_path_no_args(&mut self) -> Result<Path, ParseError> {
+        let mut path = Path::default();
+
+        let mut segment = PathSegment::default();
+        segment.identifier = self.parse_identifier()?;
+        path.segments.push(segment);
+        while self.match_token(TokenKind::Colon, 0)? {
+            self.consume()?; // Skip ':'
+            self.consume()?; // SKip ':'
+            let mut segment = PathSegment::default();
+            segment.identifier = self.parse_identifier()?;
+            path.segments.push(segment);
+        }
+
+        Ok(path)
     }
     
     pub fn parse_type_args(&mut self) -> Result<Vec<Type>, ParseError> {
@@ -1001,24 +1024,24 @@ impl Parser {
             }
         }
         self.consume()?; // Skip '>'
-        return Ok(args);
+        Ok(args)
     }
     
     pub fn parse_type(&mut self) -> Result<Type, ParseError> {
         match self.peek(0)?.kind {
             TokenKind::RefKw => {
                 self.consume()?;
-                return Ok(Type::Reference(Box::new(self.parse_type()?)));
+                Ok(Type::Reference(Box::new(self.parse_type()?)))
             }
             TokenKind::Star => {
                 self.consume()?;
-                return Ok(Type::Pointer(Box::new(self.parse_type()?)));
+                Ok(Type::Pointer(Box::new(self.parse_type()?)))
             }
             TokenKind::Name => {
                 let path = self.parse_path()?;
                 if self.match_token(TokenKind::OpenBracket, 0)? {
                     self.consume()?;
-                    if !self.match_token(TokenKind::CloseBracket, 0)? { 
+                    if !self.match_token(TokenKind::CloseBracket, 0)? {
                         let ty = Type::Array(Box::new(Type::Path(path)), Some(self.parse_literal()?));
                         self.consume()?;
                         return Ok(ty);
@@ -1027,7 +1050,7 @@ impl Parser {
                     self.consume()?;
                     return Ok(ty);
                 }
-                return Ok(Type::Path(path));
+                Ok(Type::Path(path))
             }
             TokenKind::I8Kw
             | TokenKind::I16Kw
@@ -1040,11 +1063,12 @@ impl Parser {
             | TokenKind::F32Kw
             | TokenKind::F64Kw
             | TokenKind::BoolKw
-            | TokenKind::CharKw => {
-                return Ok(Type::Primative(self.consume()?.value))
+            | TokenKind::CharKw
+            | TokenKind::VoidKw => {
+                Ok(Type::Primative(self.consume()?.value))
             }
             _ => {
-                return Err(self.gen_error("Invalid type"));
+                Err(self.gen_error("Invalid type"))
             }
         }
      }
@@ -1053,7 +1077,7 @@ impl Parser {
         let identifier = Identifier {
             name: self.consume()?.value
         };
-        return Ok(identifier);
+        Ok(identifier)
     }
     
     pub fn parse_for_loop(&mut self) -> Result<ForLoop, ParseError> {
@@ -1102,8 +1126,8 @@ impl Parser {
             line: self.tokens[index].line,
             message: message.to_string(),
         };
-        logex::log_error(format!("{}", err).as_str());
-        return err;
+        logex::log_fatal_error(format!("{}", err).as_str());
+        err
     }
 
     pub fn match_token_array(&mut self, kinds: &[TokenKind], offset: usize) -> Result<bool, ParseError> {
@@ -1112,7 +1136,7 @@ impl Parser {
                 return Ok(true);
             }
         }
-        return Ok(false);
+        Ok(false)
     }
     
     pub fn match_token(&mut self, kind: TokenKind, offset: usize) -> Result<bool, ParseError> {
@@ -1122,15 +1146,14 @@ impl Parser {
     pub fn consume(&mut self) -> Result<Token, ParseError> {
         let tok = self.peek(0);
         self.index += 1;
-        return tok;
+        tok
     }
     
     pub fn peek(&mut self, offset: usize) -> Result<Token, ParseError> {
         if self.index + offset >= self.tokens.len() {
-            return Err(self.gen_error(""))
-        }
-        else {
-            return Ok(self.tokens[self.index + offset].clone())
+            Err(self.gen_error(""))
+        } else {
+            Ok(self.tokens[self.index + offset].clone())
         }
     }
 }

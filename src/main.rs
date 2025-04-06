@@ -6,6 +6,7 @@ use std::fs;
 pub mod lexer;
 pub mod parser;
 pub mod ast;
+pub mod resolve;
 
 fn main() {
     let mut emits = EmitType::Ast;
@@ -21,6 +22,9 @@ fn main() {
         "ast" => {
             emits = EmitType::Ast
         },
+        "ast-json" => {
+            emits = EmitType::AstJson
+        },
         _ => {
             log_fatal_error(format!("Unknown emit type: {}", emit).as_str());
         }
@@ -29,15 +33,21 @@ fn main() {
     let code = fs::read_to_string(input.clone()).unwrap();
     let tokens = Lexer::new(code).tokenize().unwrap();
     let ast = parser::Parser::new(tokens).parse(input.clone()).unwrap();
+    let symboltable = resolve::walk_tank(ast.clone());
+    println!("{:#?}", symboltable);
     if emits == EmitType::Ast {
-        fs::write(format!("{}.ast", output), format!("{:#?}", ast)).unwrap();
+        let _ = fs::write(format!("{}.ast", output), format!("{:#?}", ast));
         return;
+    }
+    if emits == EmitType::AstJson {
+        fs::write(format!("{}.ast", output), serde_json::to_string_pretty(&ast).unwrap()).unwrap();
     }
 }
 
 #[derive(PartialEq)]
 enum EmitType {
-    Ast
+    Ast,
+    AstJson,
 }
 
 #[derive(Parser, Debug)]
@@ -46,7 +56,7 @@ pub struct Args {
     #[arg(short, long)]
     input: String,
 
-    #[arg(short, long, default_value = "ast")]
+    #[arg(short, long, default_value = "ast-json")]
     emit: String,
 
     #[arg(short, long, default_value = "output")]
