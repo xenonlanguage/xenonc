@@ -560,4 +560,5 @@ dependencies = [
  "logex",
  "serde",
  "serde_json",
+ "uuid",
 ]
