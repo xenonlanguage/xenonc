@@ -105,9 +105,13 @@ impl Lexer {
                     "module" => TokenKind::ModuleKw,
                     "public" => TokenKind::PublicKw,
                     "private" => TokenKind::PrivateKw,
+                    "internal" => TokenKind::InternalKw,
                     "ref" => TokenKind::RefKw,
                     "return" => TokenKind::ReturnKw,
                     "self" => TokenKind::SelfKw,
+                    "import" => TokenKind::ImportKw,
+                    "tank" => TokenKind::TankKw,
+                    "enum" => TokenKind::EnumKw,
                     "struct" => TokenKind::StructKw,
                     "unsafe" => TokenKind::UnsafeKw,
                     "use" => TokenKind::UseKw,
@@ -167,7 +171,10 @@ impl Lexer {
                     "*" => TokenKind::Star,
                     "/" => TokenKind::Slash,
                     "%" => TokenKind::Percent,
-                    _ => TokenKind::Unknown,
+                    _ => {
+                        logex::log_error(format!("Unknown Token '{}'", buffer).as_str());
+                        TokenKind::Unknown
+                    }
                 };
                 token.end_col = self.column;
                 token.value = buffer.clone();
